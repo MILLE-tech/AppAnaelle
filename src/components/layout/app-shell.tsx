@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Accueil", icon: HomeIcon },
   { href: "/matieres", label: "Matières", icon: BookIcon },
   { href: "/calendrier", label: "Calendrier", icon: CalendarIcon },
+  { href: "/historique", label: "Historique", icon: ChartIcon },
 ];
 
 export function AppShell({
@@ -140,6 +141,20 @@ function CalendarIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" className={className}>
       <rect x="4" y="5.5" width="16" height="14.5" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
       <path d="M4 10h16M8 3.5v3M16 3.5v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ChartIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M5 19V5m0 14h14M9 16v-4m4 4V9m4 7v-6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

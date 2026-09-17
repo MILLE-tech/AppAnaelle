@@ -31,3 +31,86 @@ export const SHEET_RESPONSE_SCHEMA = {
   },
   required: ["title", "content_markdown"],
 } as const;
+
+const QUESTION_TYPE_INSTRUCTIONS: Record<"true_false" | "mcq" | "open", string> = {
+  true_false: `Génère des questions VRAI/FAUX. Pour chaque question :
+- "prompt" : une affirmation claire, vraie ou fausse, basée sur le cours.
+- "correct_answer" : exactement "true" ou "false".
+- "options" : laisse un tableau vide [].
+- "explanation" : une phrase expliquant pourquoi l'affirmation est vraie ou fausse.`,
+  mcq: `Génère des questions à choix multiples (QCM). Pour chaque question :
+- "prompt" : l'énoncé de la question.
+- "options" : un tableau de EXACTEMENT 4 propositions, une seule correcte, plausibles et non triviales.
+- "correct_answer" : l'index (sous forme de chaîne "0", "1", "2" ou "3") de la bonne proposition dans "options".
+- "explanation" : une phrase expliquant pourquoi cette réponse est correcte.`,
+  open: `Génère des questions ouvertes à rédiger. Pour chaque question :
+- "prompt" : une question qui demande une réponse rédigée (pas un simple mot).
+- "options" : laisse un tableau vide [].
+- "correct_answer" : laisse une chaîne vide "".
+- "explanation" : les éléments de réponse attendus (points clés que doit contenir une bonne réponse), utilisés ensuite pour corriger l'étudiante — sois précis et complet.`,
+};
+
+export function buildQuestionsPrompt(
+  type: "true_false" | "mcq" | "open",
+  count: number
+): string {
+  return `Tu es un assistant pédagogique pour une étudiante en BTS SAM (Support à l'Action Managériale).
+À partir du texte de cours ci-dessous, génère exactement ${count} questions en français pour réviser ce cours.
+
+${QUESTION_TYPE_INSTRUCTIONS[type]}
+
+Consignes générales :
+- Base-toi uniquement sur le contenu du cours fourni, n'invente rien d'absent.
+- Varie les questions : ne répète pas la même idée sous des formulations différentes.
+- Formulations claires et sans ambiguïté.
+
+Réponds uniquement avec un objet JSON respectant le schéma fourni : un tableau "questions" contenant exactement ${count} éléments.`;
+}
+
+export const QUESTIONS_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    questions: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          prompt: { type: "STRING" },
+          options: { type: "ARRAY", items: { type: "STRING" } },
+          correct_answer: { type: "STRING" },
+          explanation: { type: "STRING" },
+        },
+        required: ["prompt", "options", "correct_answer", "explanation"],
+      },
+    },
+  },
+  required: ["questions"],
+} as const;
+
+export function buildOpenGradingPrompt(
+  question: string,
+  expectedPoints: string,
+  studentAnswer: string
+): string {
+  return `Tu es une correctrice bienveillante pour une étudiante en BTS SAM.
+Question posée : "${question}"
+
+Éléments de réponse attendus : "${expectedPoints}"
+
+Réponse de l'étudiante : "${studentAnswer}"
+
+Corrige cette réponse :
+- Donne une note sur 10 ("score"), juste et cohérente avec les éléments attendus.
+- Rédige un retour ("feedback") bienveillant, jamais cassant, en français : commence par ce qui est réussi, puis indique précisément ce qui manque ou pourrait être amélioré, en 2 à 4 phrases.
+
+Réponds uniquement avec un objet JSON respectant le schéma fourni.`;
+}
+
+export const OPEN_GRADING_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    score: { type: "NUMBER" },
+    feedback: { type: "STRING" },
+  },
+  required: ["score", "feedback"],
+} as const;

@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { DocumentRow } from "@/lib/documents/pipeline";
 import { createClient } from "@/lib/supabase/client";
 import { clsx } from "@/lib/utils/clsx";
+import { QuestionSetsPanel, type QuestionSetSummary } from "@/components/documents/question-sets-panel";
 
 export interface SheetSummary {
   id: string;
@@ -37,16 +38,20 @@ const METHOD_LABELS: Record<string, string> = {
 interface DocumentListProps {
   documents: DocumentRow[];
   sheetsByDocument: Record<string, SheetSummary>;
+  questionSetsByDocument: Record<string, QuestionSetSummary[]>;
   onDeleted: (id: string) => void;
   onSheetGenerated: (documentId: string, sheet: SheetSummary) => void;
+  onQuestionSetGenerated: (documentId: string, set: QuestionSetSummary) => void;
   disableGeneration: boolean;
 }
 
 export function DocumentList({
   documents,
   sheetsByDocument,
+  questionSetsByDocument,
   onDeleted,
   onSheetGenerated,
+  onQuestionSetGenerated,
   disableGeneration,
 }: DocumentListProps) {
   if (documents.length === 0) {
@@ -64,8 +69,10 @@ export function DocumentList({
           key={doc.id}
           doc={doc}
           sheet={sheetsByDocument[doc.id]}
+          questionSets={questionSetsByDocument[doc.id] ?? []}
           onDeleted={onDeleted}
           onSheetGenerated={onSheetGenerated}
+          onQuestionSetGenerated={onQuestionSetGenerated}
           disableGeneration={disableGeneration}
         />
       ))}
@@ -76,14 +83,18 @@ export function DocumentList({
 function DocumentItem({
   doc,
   sheet,
+  questionSets,
   onDeleted,
   onSheetGenerated,
+  onQuestionSetGenerated,
   disableGeneration,
 }: {
   doc: DocumentRow;
   sheet: SheetSummary | undefined;
+  questionSets: QuestionSetSummary[];
   onDeleted: (id: string) => void;
   onSheetGenerated: (documentId: string, sheet: SheetSummary) => void;
+  onQuestionSetGenerated: (documentId: string, set: QuestionSetSummary) => void;
   disableGeneration: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -148,11 +159,11 @@ function DocumentItem({
         </div>
 
         {doc.status === "ready" && (
-          <div className="mt-2">
+          <div className="mt-2 flex flex-col gap-2">
             {sheet ? (
               <Link
                 href={`/fiches/${sheet.id}`}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent hover:brightness-110"
+                className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent hover:brightness-110"
               >
                 Voir la fiche
               </Link>
@@ -160,14 +171,19 @@ function DocumentItem({
               <button
                 onClick={handleGenerateSheet}
                 disabled={isGenerating || disableGeneration}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:text-foreground disabled:opacity-50"
+                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-surface-border px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:text-foreground disabled:opacity-50"
               >
                 {isGenerating ? "Génération de la fiche..." : "Générer la fiche"}
               </button>
             )}
-            {generationError && (
-              <p className="mt-1 text-xs text-danger">{generationError}</p>
-            )}
+            {generationError && <p className="text-xs text-danger">{generationError}</p>}
+
+            <QuestionSetsPanel
+              documentId={doc.id}
+              sets={questionSets}
+              disabled={disableGeneration}
+              onSetCreated={onQuestionSetGenerated}
+            />
           </div>
         )}
       </div>
