@@ -23,7 +23,7 @@ Studio (palier gratuit).
 - [x] Étape 2 — Upload de documents + extraction de texte
 - [x] Étape 3 — Génération de fiches de révision
 - [x] Étape 4 — Questions, score et reprise des erreurs
-- [ ] Étape 5 — Calendrier et tableau de bord
+- [x] Étape 5 — Calendrier et tableau de bord
 
 ## 1. Créer le projet Supabase
 
