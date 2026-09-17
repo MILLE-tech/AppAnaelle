@@ -30,6 +30,15 @@ export default async function SubjectPage({
     .eq("subject_id", subjectId)
     .order("created_at", { ascending: false });
 
+  const { data: sheets } = await supabase
+    .from("revision_sheets")
+    .select("id, document_id, title")
+    .eq("subject_id", subjectId);
+
+  const sheetsByDocument = Object.fromEntries(
+    (sheets ?? []).map((sheet) => [sheet.document_id, sheet])
+  );
+
   return (
     <div className="mx-auto max-w-3xl">
       <Link href="/matieres" className="text-sm text-muted hover:text-foreground">
@@ -49,6 +58,7 @@ export default async function SubjectPage({
           subjectId={subject.id}
           userId={user.id}
           initialDocuments={documents ?? []}
+          initialSheetsByDocument={sheetsByDocument}
         />
       </div>
     </div>

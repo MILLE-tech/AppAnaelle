@@ -22,7 +22,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen flex-col pb-20 md:pb-0 md:pl-64">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-surface-border bg-background-elevated/60 p-6 md:flex">
+      <aside className="print-hidden fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-surface-border bg-background-elevated/60 p-6 md:flex">
         <Link href="/dashboard" className="mb-10 text-2xl font-semibold">
           <span className="gradient-text">AppAnaelle</span>
         </Link>
@@ -44,7 +44,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-surface-border bg-background/80 px-4 py-3 backdrop-blur-lg md:hidden">
+      <header className="print-hidden sticky top-0 z-20 flex items-center justify-between border-b border-surface-border bg-background/80 px-4 py-3 backdrop-blur-lg md:hidden">
         <span className="text-xl font-semibold">
           <span className="gradient-text">AppAnaelle</span>
         </span>
@@ -57,7 +57,7 @@ export function AppShell({
 
       <main className="flex-1 px-4 py-6 md:px-10 md:py-10">{children}</main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-surface-border bg-background-elevated/90 backdrop-blur-lg md:hidden">
+      <nav className="print-hidden fixed inset-x-0 bottom-0 z-20 flex border-t border-surface-border bg-background-elevated/90 backdrop-blur-lg md:hidden">
         {NAV_ITEMS.map((item) => (
           <MobileNavLink key={item.href} item={item} active={pathname.startsWith(item.href)} />
         ))}

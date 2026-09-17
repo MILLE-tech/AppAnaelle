@@ -4,17 +4,24 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { processDocument, type DocumentRow } from "@/lib/documents/pipeline";
 import { UploadZone } from "@/components/documents/upload-zone";
-import { DocumentList } from "@/components/documents/document-list";
+import { DocumentList, type SheetSummary } from "@/components/documents/document-list";
 import { Card } from "@/components/ui/card";
 
 interface DocumentsPanelProps {
   subjectId: string;
   userId: string;
   initialDocuments: DocumentRow[];
+  initialSheetsByDocument: Record<string, SheetSummary>;
 }
 
-export function DocumentsPanel({ subjectId, userId, initialDocuments }: DocumentsPanelProps) {
+export function DocumentsPanel({
+  subjectId,
+  userId,
+  initialDocuments,
+  initialSheetsByDocument,
+}: DocumentsPanelProps) {
   const [documents, setDocuments] = useState<DocumentRow[]>(initialDocuments);
+  const [sheetsByDocument, setSheetsByDocument] = useState(initialSheetsByDocument);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<{ index: number; total: number; stage: string } | null>(
     null
@@ -57,6 +64,10 @@ export function DocumentsPanel({ subjectId, userId, initialDocuments }: Document
     setDocuments((prev) => prev.filter((d) => d.id !== id));
   }
 
+  function handleSheetGenerated(documentId: string, sheet: SheetSummary) {
+    setSheetsByDocument((prev) => ({ ...prev, [documentId]: sheet }));
+  }
+
   const progressLabel = progress
     ? `Document ${progress.index}/${progress.total} — ${progress.stage}`
     : null;
@@ -69,7 +80,13 @@ export function DocumentsPanel({ subjectId, userId, initialDocuments }: Document
         progressLabel={progressLabel}
       />
       <Card>
-        <DocumentList documents={documents} onDeleted={handleDeleted} />
+        <DocumentList
+          documents={documents}
+          sheetsByDocument={sheetsByDocument}
+          onDeleted={handleDeleted}
+          onSheetGenerated={handleSheetGenerated}
+          disableGeneration={isProcessing}
+        />
       </Card>
     </div>
   );

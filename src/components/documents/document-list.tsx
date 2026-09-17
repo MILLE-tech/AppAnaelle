@@ -1,9 +1,16 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
+import Link from "next/link";
 import type { DocumentRow } from "@/lib/documents/pipeline";
 import { createClient } from "@/lib/supabase/client";
 import { clsx } from "@/lib/utils/clsx";
+
+export interface SheetSummary {
+  id: string;
+  document_id: string;
+  title: string;
+}
 
 const STATUS_LABELS: Record<DocumentRow["status"], string> = {
   uploading: "Envoi...",
@@ -29,10 +36,19 @@ const METHOD_LABELS: Record<string, string> = {
 
 interface DocumentListProps {
   documents: DocumentRow[];
+  sheetsByDocument: Record<string, SheetSummary>;
   onDeleted: (id: string) => void;
+  onSheetGenerated: (documentId: string, sheet: SheetSummary) => void;
+  disableGeneration: boolean;
 }
 
-export function DocumentList({ documents, onDeleted }: DocumentListProps) {
+export function DocumentList({
+  documents,
+  sheetsByDocument,
+  onDeleted,
+  onSheetGenerated,
+  disableGeneration,
+}: DocumentListProps) {
   if (documents.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-muted">
@@ -44,7 +60,14 @@ export function DocumentList({ documents, onDeleted }: DocumentListProps) {
   return (
     <ul className="divide-y divide-surface-border">
       {documents.map((doc) => (
-        <DocumentItem key={doc.id} doc={doc} onDeleted={onDeleted} />
+        <DocumentItem
+          key={doc.id}
+          doc={doc}
+          sheet={sheetsByDocument[doc.id]}
+          onDeleted={onDeleted}
+          onSheetGenerated={onSheetGenerated}
+          disableGeneration={disableGeneration}
+        />
       ))}
     </ul>
   );
@@ -52,12 +75,20 @@ export function DocumentList({ documents, onDeleted }: DocumentListProps) {
 
 function DocumentItem({
   doc,
+  sheet,
   onDeleted,
+  onSheetGenerated,
+  disableGeneration,
 }: {
   doc: DocumentRow;
+  sheet: SheetSummary | undefined;
   onDeleted: (id: string) => void;
+  onSheetGenerated: (documentId: string, sheet: SheetSummary) => void;
+  disableGeneration: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const busy = ["uploading", "extracting", "analyzing"].includes(doc.status);
 
   function handleDelete() {
@@ -70,6 +101,25 @@ function DocumentItem({
       await supabase.from("documents").delete().eq("id", doc.id);
       onDeleted(doc.id);
     });
+  }
+
+  async function handleGenerateSheet() {
+    setIsGenerating(true);
+    setGenerationError(null);
+    try {
+      const response = await fetch(`/api/documents/${doc.id}/generate-sheet`, {
+        method: "POST",
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error ?? "Échec de la génération de la fiche.");
+      }
+      onSheetGenerated(doc.id, json.sheet);
+    } catch (err) {
+      setGenerationError(err instanceof Error ? err.message : "Erreur inattendue.");
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   return (
@@ -96,6 +146,30 @@ function DocumentItem({
             <span className="text-danger">{doc.error_message}</span>
           )}
         </div>
+
+        {doc.status === "ready" && (
+          <div className="mt-2">
+            {sheet ? (
+              <Link
+                href={`/fiches/${sheet.id}`}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent hover:brightness-110"
+              >
+                Voir la fiche
+              </Link>
+            ) : (
+              <button
+                onClick={handleGenerateSheet}
+                disabled={isGenerating || disableGeneration}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:text-foreground disabled:opacity-50"
+              >
+                {isGenerating ? "Génération de la fiche..." : "Générer la fiche"}
+              </button>
+            )}
+            {generationError && (
+              <p className="mt-1 text-xs text-danger">{generationError}</p>
+            )}
+          </div>
+        )}
       </div>
       <button
         onClick={handleDelete}

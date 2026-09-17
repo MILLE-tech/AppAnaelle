@@ -21,7 +21,7 @@ Studio (palier gratuit).
 
 - [x] Étape 1 — Auth + schéma Supabase
 - [x] Étape 2 — Upload de documents + extraction de texte
-- [ ] Étape 3 — Génération de fiches de révision
+- [x] Étape 3 — Génération de fiches de révision
 - [ ] Étape 4 — Questions, score et reprise des erreurs
 - [ ] Étape 5 — Calendrier et tableau de bord
 
