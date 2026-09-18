@@ -44,7 +44,28 @@ Studio (palier gratuit).
    convient. Vérifie dans **Authentication > URL Configuration** que la
    **Site URL** correspond à ton domaine (`http://localhost:3000` en local,
    ton URL Vercel en production) pour que les liens de confirmation d'email
-   fonctionnent.
+   fonctionnent, et ajoute ce domaine (avec `/**`) dans **Redirect URLs**.
+5. Toujours dans **Authentication > Emails**, ouvre le template **"Reset
+   Password"** et remplace son lien par défaut (qui utilise
+   `{{ .ConfirmationURL }}`, un lien vers le serveur Supabase lui-même) par
+   un lien direct vers l'application avec `{{ .TokenHash }}` :
+
+   ```html
+   <a href="{{ .SiteURL }}/reinitialiser-mot-de-passe?token_hash={{ .TokenHash }}&type=recovery">
+     Réinitialiser mon mot de passe
+   </a>
+   ```
+
+   C'est nécessaire car `{{ .ConfirmationURL }}` fait vérifier le lien à
+   usage unique par le serveur Supabase **avant** qu'il n'atteigne
+   l'application — hors, de nombreux clients mail (Gmail, Outlook...)
+   pré-visitent automatiquement les liens reçus pour les scanner, ce qui
+   consomme le token avant que l'utilisatrice ne clique elle-même, et le
+   lien paraît alors "invalide" à l'usage. En passant directement le
+   `token_hash` en paramètre vers `/reinitialiser-mot-de-passe`, la
+   vérification n'a lieu qu'à la soumission du formulaire par
+   l'utilisatrice (voir `src/components/auth/reset-password-form.tsx`),
+   pas au simple chargement de la page.
 
 ## 2. Obtenir une clé Gemini gratuite (Google AI Studio)
 
