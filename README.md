@@ -67,6 +67,25 @@ Studio (palier gratuit).
    l'utilisatrice (voir `src/components/auth/reset-password-form.tsx`),
    pas au simple chargement de la page.
 
+   ⚠️ Sur les projets Supabase récents, le bouton **"Source"** du template
+   (qui permet d'éditer le HTML brut) est verrouillé tant qu'aucun SMTP
+   personnalisé n'est configuré. Il faut donc brancher un service SMTP
+   gratuit avant de pouvoir faire cette modification :
+   1. Crée un compte gratuit sur [Brevo](https://www.brevo.com) (ex-Sendinblue,
+      300 emails/jour gratuits à vie, aucune carte bancaire requise).
+   2. Dans Brevo, **Settings > Senders, Domains & Dedicated IPs > Senders** :
+      ajoute et valide une adresse email d'expédition (le lien de validation
+      part sur cette adresse).
+   3. Dans Brevo, **SMTP & API > SMTP** : note l'hôte
+      (`smtp-relay.brevo.com`), le port (`587`), l'identifiant (ton email de
+      compte Brevo) et génère une clé SMTP.
+   4. Dans Supabase, **Authentication > Emails**, clique sur **"Set up
+      SMTP"** et renseigne ces informations (sender email = l'adresse
+      validée à l'étape 2, sender name = `AppAnaelle`).
+   5. Une fois le SMTP enregistré, le bouton **"Source"** du template
+      devient éditable — reviens alors modifier le lien du template "Reset
+      Password" comme indiqué ci-dessus.
+
 ## 2. Obtenir une clé Gemini gratuite (Google AI Studio)
 
 1. Va sur [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
