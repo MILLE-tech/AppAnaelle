@@ -15,7 +15,7 @@ export default async function MatieresPage() {
     console.error("[matieres] échec du chargement des matières :", error);
   }
 
-  const subjects = data ?? [];
+  const subjects = Array.isArray(data) ? data : [];
 
   return (
     <div className="mx-auto max-w-5xl">
