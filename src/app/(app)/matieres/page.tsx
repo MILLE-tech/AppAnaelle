@@ -6,10 +6,16 @@ import { Card } from "@/components/ui/card";
 export default async function MatieresPage() {
   const supabase = await createClient();
 
-  const { data: subjects } = await supabase
+  const { data, error } = await supabase
     .from("subjects")
     .select("id, name, color, documents(count)")
     .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[matieres] échec du chargement des matières :", error);
+  }
+
+  const subjects = data ?? [];
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -20,7 +26,11 @@ export default async function MatieresPage() {
         <SubjectForm />
       </Card>
 
-      {subjects && subjects.length > 0 ? (
+      {error ? (
+        <p className="mt-8 text-center text-sm text-danger">
+          Impossible de charger tes matières pour l&apos;instant. Réessaie dans un instant.
+        </p>
+      ) : subjects.length > 0 ? (
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {subjects.map((subject) => (
             <SubjectCard
