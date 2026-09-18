@@ -1,27 +1,66 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-import { updatePassword, type AuthActionState } from "@/lib/actions/auth";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 
-const initialState: AuthActionState = { error: null };
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Enregistrement..." : "Changer mon mot de passe"}
-    </Button>
-  );
+interface ResetPasswordFormProps {
+  tokenHash: string;
 }
 
-export function ResetPasswordForm() {
-  const [state, formAction] = useActionState(updatePassword, initialState);
+export function ResetPasswordForm({ tokenHash }: ResetPasswordFormProps) {
+  const router = useRouter();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (password.length < 8) {
+      setError("Le mot de passe doit contenir au moins 8 caractères.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const supabase = createClient();
+
+    // La vérification du lien n'a lieu qu'ici, au moment où l'utilisatrice
+    // valide réellement le formulaire (voir la note dans requestPasswordReset).
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      type: "recovery",
+      token_hash: tokenHash,
+    });
+
+    if (verifyError) {
+      setError(
+        "Ce lien de réinitialisation n'est plus valide (il a peut-être déjà été utilisé). Redemande un email."
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    if (updateError) {
+      setError("Impossible de mettre à jour le mot de passe. Réessaie.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    await supabase.auth.signOut();
+    router.push("/login?reset=success");
+  }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label htmlFor="password">Nouveau mot de passe</Label>
         <Input
@@ -30,6 +69,8 @@ export function ResetPasswordForm() {
           type="password"
           autoComplete="new-password"
           placeholder="8 caractères minimum"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
           required
           minLength={8}
         />
@@ -43,18 +84,22 @@ export function ResetPasswordForm() {
           type="password"
           autoComplete="new-password"
           placeholder="••••••••"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
           required
           minLength={8}
         />
       </div>
 
-      {state.error && (
+      {error && (
         <p className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
-          {state.error}
+          {error}
         </p>
       )}
 
-      <SubmitButton />
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? "Enregistrement..." : "Changer mon mot de passe"}
+      </Button>
     </form>
   );
 }
