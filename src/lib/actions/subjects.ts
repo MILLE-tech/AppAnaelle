@@ -2,19 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { PRESET_COLORS } from "@/lib/constants/subjects";
 
 export interface SubjectActionState {
   error: string | null;
 }
-
-const PRESET_COLORS = [
-  "#8b5cf6",
-  "#6366f1",
-  "#22c55e",
-  "#f59e0b",
-  "#f43f5e",
-  "#06b6d4",
-];
 
 export async function createSubject(
   _prevState: SubjectActionState,
@@ -84,5 +76,3 @@ export async function renameSubject(
   revalidatePath("/matieres");
   revalidatePath(`/matieres/${subjectId}`);
 }
-
-export { PRESET_COLORS };

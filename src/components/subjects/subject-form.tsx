@@ -2,14 +2,15 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import {
-  createSubject,
-  PRESET_COLORS,
-  type SubjectActionState,
-} from "@/lib/actions/subjects";
+import { createSubject, type SubjectActionState } from "@/lib/actions/subjects";
+import { PRESET_COLORS } from "@/lib/constants/subjects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { clsx } from "@/lib/utils/clsx";
+
+// Filet de sécurité : garantit un tableau même si l'import venait à
+// résoudre vers undefined (ex. build cassé) pour ne jamais planter le rendu.
+const colorOptions = Array.isArray(PRESET_COLORS) ? PRESET_COLORS : [];
 
 const initialState: SubjectActionState = { error: null };
 
@@ -24,7 +25,7 @@ function SubmitButton() {
 
 export function SubjectForm() {
   const [state, formAction] = useActionState(createSubject, initialState);
-  const [color, setColor] = useState(PRESET_COLORS[0]);
+  const [color, setColor] = useState<string>(colorOptions[0] ?? "#8b5cf6");
 
   return (
     <form action={formAction} className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -35,7 +36,7 @@ export function SubjectForm() {
       </div>
 
       <div className="flex items-center gap-2">
-        {PRESET_COLORS.map((c) => (
+        {colorOptions.map((c) => (
           <button
             key={c}
             type="button"
