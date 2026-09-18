@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 
-export default async function ResetPasswordPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default async function ResetPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ token_hash?: string; type?: string }>;
+}) {
+  const { token_hash: tokenHash, type } = await searchParams;
 
-  if (!user) {
+  if (!tokenHash || type !== "recovery") {
     return (
       <>
         <h2 className="mb-2 text-2xl font-semibold">Lien invalide ou expiré</h2>
@@ -30,7 +30,7 @@ export default async function ResetPasswordPage() {
     <>
       <h2 className="mb-2 text-2xl font-semibold">Nouveau mot de passe</h2>
       <p className="mb-6 text-sm text-muted">Choisis un nouveau mot de passe pour ton compte.</p>
-      <ResetPasswordForm />
+      <ResetPasswordForm tokenHash={tokenHash} />
     </>
   );
 }
