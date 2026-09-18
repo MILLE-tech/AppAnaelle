@@ -64,13 +64,23 @@ export function QuestionSetsPanel({
       {sets.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {sets.map((set) => (
-            <Link
+            <span
               key={set.id}
-              href={`/reviser/set/${set.id}`}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent hover:brightness-110"
+              className="inline-flex items-center gap-1 rounded-lg bg-accent-soft px-1 py-1 text-xs font-medium text-accent"
             >
-              {TYPE_LABELS[set.question_type as QuestionType]} ({set.requested_count})
-            </Link>
+              <Link
+                href={`/questions/${set.id}`}
+                className="px-1.5 py-0.5 hover:brightness-110"
+              >
+                {TYPE_LABELS[set.question_type as QuestionType]} ({set.requested_count})
+              </Link>
+              <Link
+                href={`/reviser/set/${set.id}`}
+                className="rounded-md bg-white/10 px-1.5 py-0.5 hover:brightness-110"
+              >
+                Réviser
+              </Link>
+            </span>
           ))}
         </div>
       )}
