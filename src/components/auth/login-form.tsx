@@ -38,7 +38,14 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
       </div>
 
       <div>
-        <Label htmlFor="password">Mot de passe</Label>
+        <div className="mb-1.5 flex items-center justify-between">
+          <label htmlFor="password" className="text-sm font-medium text-muted">
+            Mot de passe
+          </label>
+          <Link href="/mot-de-passe-oublie" className="text-xs text-muted hover:text-foreground">
+            Mot de passe oublié ?
+          </Link>
+        </div>
         <Input
           id="password"
           name="password"
