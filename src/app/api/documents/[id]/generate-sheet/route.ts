@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, GeminiQuotaError } from "@/lib/gemini/client";
+import { generateContent, GeminiQuotaError, GeminiOverloadedError } from "@/lib/gemini/client";
 import { SHEET_GENERATION_PROMPT, SHEET_RESPONSE_SCHEMA } from "@/lib/gemini/prompts";
+
+// Laisse le temps aux retries (429/503) de Gemini d'aboutir avant que
+// Vercel ne tue la fonction (10s par défaut sur le plan Hobby).
+export const maxDuration = 60;
 
 interface SheetPayload {
   title: string;
@@ -103,6 +107,9 @@ export async function POST(
   } catch (err) {
     if (err instanceof GeminiQuotaError) {
       return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    if (err instanceof GeminiOverloadedError) {
+      return NextResponse.json({ error: err.message }, { status: 503 });
     }
     const message = err instanceof Error ? err.message : "Erreur inconnue.";
     return NextResponse.json({ error: message }, { status: 500 });

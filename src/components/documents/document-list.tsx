@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { DocumentRow } from "@/lib/documents/pipeline";
 import { createClient } from "@/lib/supabase/client";
 import { clsx } from "@/lib/utils/clsx";
+import { EmptyState } from "@/components/ui/empty-state";
 import { QuestionSetsPanel, type QuestionSetSummary } from "@/components/documents/question-sets-panel";
 
 export interface SheetSummary {
@@ -56,9 +57,11 @@ export function DocumentList({
 }: DocumentListProps) {
   if (documents.length === 0) {
     return (
-      <p className="py-6 text-center text-sm text-muted">
-        Aucun document pour l&apos;instant.
-      </p>
+      <EmptyState
+        icon={<UploadIcon className="h-6 w-6" />}
+        title="Aucun document pour l'instant"
+        description="Dépose un PDF ou une photo de cours ci-dessus pour générer une fiche de révision et des quiz."
+      />
     );
   }
 
@@ -196,6 +199,20 @@ function DocumentItem({
         <TrashIcon className="h-4 w-4" />
       </button>
     </li>
+  );
+}
+
+function UploadIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M12 15V4m0 0 4 4m-4-4-4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SubjectForm } from "@/components/subjects/subject-form";
 import { SubjectCard } from "@/components/subjects/subject-card";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function MatieresPage() {
   const supabase = await createClient();
@@ -43,10 +44,29 @@ export default async function MatieresPage() {
           ))}
         </div>
       ) : (
-        <p className="mt-8 text-center text-sm text-muted">
-          Aucune matière pour l&apos;instant — crée la première ci-dessus.
-        </p>
+        <Card className="mt-6">
+          <EmptyState
+            icon={<BookIcon className="h-6 w-6" />}
+            title="Aucune matière pour l'instant"
+            description="Crée ta première matière ci-dessus (ex : Culture éco-juridique et managériale), puis ajoute tes cours en PDF ou en photo pour générer fiches et quiz."
+          />
+        </Card>
       )}
     </div>
+  );
+}
+
+function BookIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M5 4.5h9a3 3 0 0 1 3 3V20a2 2 0 0 0-2-1.5H5V4.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M5 18.5V20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   );
 }
