@@ -105,9 +105,16 @@ export async function requestPasswordReset(
   // Sinon, les scanners de liens des clients mail (Gmail, Outlook...) qui
   // "pré-cliquent" les liens pour les vérifier consomment le token avant
   // l'utilisatrice, qui tombe alors sur un lien "invalide".
-  await supabase.auth.resetPasswordForEmail(email, {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${siteUrl()}/reinitialiser-mot-de-passe`,
   });
+
+  // Le message renvoyé à l'utilisatrice reste volontairement générique
+  // (voir plus bas), mais on logge l'échec réel côté serveur pour pouvoir
+  // le diagnostiquer dans les logs Vercel.
+  if (error) {
+    console.error("[requestPasswordReset] échec de l'envoi de l'email :", error);
+  }
 
   // Message générique volontaire : ne pas révéler si l'email existe ou non.
   return {
