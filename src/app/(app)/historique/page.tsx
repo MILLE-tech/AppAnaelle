@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ScoreChart } from "@/components/history/score-chart";
 
 export default async function HistoriquePage() {
@@ -76,9 +79,32 @@ export default async function HistoriquePage() {
             })}
           </ul>
         ) : (
-          <p className="py-6 text-center text-sm text-muted">Aucune session terminée pour l&apos;instant.</p>
+          <EmptyState
+            icon={<ChartIcon className="h-6 w-6" />}
+            title="Aucune session terminée pour l'instant"
+            description="Génère des questions sur un de tes documents puis lance une révision : ton score et ta progression s'afficheront ici."
+            action={
+              <Link href="/matieres">
+                <Button variant="secondary">Aller à mes matières</Button>
+              </Link>
+            }
+          />
         )}
       </Card>
     </div>
+  );
+}
+
+function ChartIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M5 19V5m0 14h14M9 16v-4m4 4V9m4 7v-6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

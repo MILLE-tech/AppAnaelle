@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, GeminiQuotaError } from "@/lib/gemini/client";
+import { generateContent, GeminiQuotaError, GeminiOverloadedError } from "@/lib/gemini/client";
 import { buildQuestionsPrompt, QUESTIONS_RESPONSE_SCHEMA } from "@/lib/gemini/prompts";
 import type { QuestionType } from "@/types/database.types";
+
+// Laisse le temps aux retries (429/503) de Gemini d'aboutir avant que
+// Vercel ne tue la fonction (10s par défaut sur le plan Hobby).
+export const maxDuration = 60;
 
 const VALID_TYPES: QuestionType[] = ["true_false", "mcq", "open"];
 const VALID_COUNTS = [5, 10, 20];
@@ -147,6 +151,9 @@ export async function POST(
   } catch (err) {
     if (err instanceof GeminiQuotaError) {
       return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    if (err instanceof GeminiOverloadedError) {
+      return NextResponse.json({ error: err.message }, { status: 503 });
     }
     const message = err instanceof Error ? err.message : "Erreur inconnue.";
     return NextResponse.json({ error: message }, { status: 500 });

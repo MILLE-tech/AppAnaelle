@@ -121,9 +121,9 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold capitalize">{MONTH_FORMATTER.format(month)}</h2>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
             className="rounded-lg border border-surface-border p-2 text-muted hover:text-foreground"
@@ -138,6 +138,10 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
           >
             <ChevronIcon className="h-4 w-4" />
           </button>
+          <Button onClick={() => openForm(today)} className="ml-1 !px-3 !py-2">
+            <PlusIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Ajouter une évaluation</span>
+          </Button>
         </div>
       </div>
 
@@ -272,6 +276,14 @@ function ChevronIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className}>
       <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

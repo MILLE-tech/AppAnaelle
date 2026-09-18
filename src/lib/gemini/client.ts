@@ -7,6 +7,13 @@ export class GeminiQuotaError extends Error {
   }
 }
 
+export class GeminiOverloadedError extends Error {
+  constructor() {
+    super("Le modèle Gemini est momentanément surchargé. Réessaie dans une minute.");
+    this.name = "GeminiOverloadedError";
+  }
+}
+
 export interface GeminiPart {
   text?: string;
   inlineData?: { mimeType: string; data: string };
@@ -81,10 +88,25 @@ export async function generateContent({
       continue;
     }
 
+    // 503 (UNAVAILABLE) signale une surcharge momentanée du modèle côté
+    // Google, distincte du quota épuisé : elle se résout généralement en
+    // quelques dizaines de secondes, d'où un retry avec backoff dédié.
+    if (response.status === 503) {
+      if (attempt === MAX_RETRIES) throw new GeminiOverloadedError();
+      await sleep(BASE_DELAY_MS * 2 ** attempt);
+      continue;
+    }
+
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      if (errText.toUpperCase().includes("RESOURCE_EXHAUSTED")) {
+      const upperErrText = errText.toUpperCase();
+      if (upperErrText.includes("RESOURCE_EXHAUSTED")) {
         if (attempt === MAX_RETRIES) throw new GeminiQuotaError();
+        await sleep(BASE_DELAY_MS * 2 ** attempt);
+        continue;
+      }
+      if (upperErrText.includes("UNAVAILABLE")) {
+        if (attempt === MAX_RETRIES) throw new GeminiOverloadedError();
         await sleep(BASE_DELAY_MS * 2 ** attempt);
         continue;
       }
