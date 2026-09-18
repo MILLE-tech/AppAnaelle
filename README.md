@@ -6,16 +6,18 @@ fiches de synthèse, quiz et suivi de progression générés à partir des cours
 calendrier des évaluations.
 
 Conçue pour tourner intégralement sur des offres **gratuites, sans carte
-bancaire** : Vercel (Hobby), Supabase (Free) et l'API Gemini via Google AI
-Studio (palier gratuit).
+bancaire** : Vercel (Hobby), Supabase (Free) et l'API Groq (palier gratuit).
 
 ## Stack
 
 - [Next.js 15](https://nextjs.org) (App Router) + TypeScript + Tailwind CSS 4
 - [Supabase](https://supabase.com) : Auth, Postgres, Row Level Security, Storage
-- [Google Gemini](https://ai.google.dev) (modèle du palier gratuit, appelé
+- [Groq](https://groq.com) (modèles open-weight du palier gratuit, appelés
   uniquement depuis des routes API serveur — la clé n'est jamais exposée au
-  client)
+  client). Le projet utilisait initialement Gemini (Google AI Studio) ; le
+  palier gratuit de Gemini s'est révélé trop restrictif en pratique (20
+  requêtes/jour sur les modèles Flash), d'où la bascule vers Groq, dont le
+  palier gratuit est nettement plus généreux sans carte bancaire.
 
 ## Avancement
 
@@ -86,26 +88,34 @@ Studio (palier gratuit).
       devient éditable — reviens alors modifier le lien du template "Reset
       Password" comme indiqué ci-dessus.
 
-## 2. Obtenir une clé Gemini gratuite (Google AI Studio)
+## 2. Obtenir une clé Groq gratuite
 
-1. Va sur [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
-   et connecte-toi avec un compte Google (aucune carte bancaire requise pour
-   le palier gratuit).
-2. Clique sur **Create API key**, choisis ou crée un projet Google Cloud, puis
-   copie la clé générée → `GEMINI_API_KEY`.
-3. Le palier gratuit limite le nombre de requêtes par minute et par jour selon
-   le modèle. Le nom du modèle est configurable via `GEMINI_MODEL` (par
-   défaut `gemini-2.5-flash`) car l'offre gratuite de Google évolue
-   régulièrement — vérifie les modèles disponibles sur
-   [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models)
-   et mets à jour cette variable si besoin, sans toucher au code.
+1. Va sur [console.groq.com](https://console.groq.com) et crée un compte
+   gratuit (aucune carte bancaire requise).
+2. Dans le menu, va sur **API Keys → Create API Key**, donne-lui un nom (ex.
+   `AppAnaelle`) et copie la clé générée (commence par `gsk_...`) →
+   `GROQ_API_KEY`.
+3. Le projet utilise deux modèles différents, configurables sans toucher au
+   code :
+   - `GROQ_TEXT_MODEL` (fiches, questions, correction) — par défaut
+     `openai/gpt-oss-120b`.
+   - `GROQ_VISION_MODEL` (lecture des photos de cours et PDF scannés) — par
+     défaut `meta-llama/llama-4-scout-17b-16e-instruct`. Ce modèle doit
+     obligatoirement supporter les entrées image ; si tu changes de modèle
+     vision, vérifie sur [console.groq.com/docs/rate-limits](https://console.groq.com/docs/rate-limits)
+     qu'il accepte bien les images et combien il en accepte par requête (5
+     maximum pour Llama 4 Scout — voir `MAX_IMAGES_PER_VISION_CALL` dans
+     `src/lib/documents/pipeline.ts` si ça change).
+4. Les quotas gratuits évoluent régulièrement : vérifie-les sur
+   **console.groq.com → Limite de débit** avant de partir sur un modèle en
+   particulier, surtout la colonne RPD (requêtes par jour).
 
 ## 3. Installation locale
 
 ```bash
 npm install
 cp .env.example .env.local
-# puis renseigne les valeurs Supabase et Gemini dans .env.local
+# puis renseigne les valeurs Supabase et Groq dans .env.local
 npm run dev
 ```
 
@@ -121,9 +131,9 @@ connecte-toi.
 3. Dans les réglages du projet Vercel, ajoute les mêmes variables
    d'environnement que dans `.env.local` (Project Settings > Environment
    Variables) : `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-   `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, et
-   `NEXT_PUBLIC_SITE_URL` (mets l'URL Vercel finale, ex.
-   `https://appanaelle.vercel.app`).
+   `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, `GROQ_TEXT_MODEL`,
+   `GROQ_VISION_MODEL`, et `NEXT_PUBLIC_SITE_URL` (mets l'URL Vercel finale,
+   ex. `https://appanaelle.vercel.app`).
 4. Déploie. Mets ensuite à jour la **Site URL** et les **Redirect URLs** dans
    Supabase (Authentication > URL Configuration) avec l'URL Vercel, pour que
    les emails de confirmation redirigent au bon endroit.
@@ -152,18 +162,19 @@ supabase/
   schema.sql              schéma complet (tables, RLS, bucket Storage)
 ```
 
-## Économie de quota Gemini
+## Économie de quota Groq
 
 - Les PDF sont analysés côté client (`pdfjs-dist`) : seul le **texte extrait**
-  est envoyé à Gemini. Le PDF brut n'est envoyé (en vision) que si
-  l'extraction ne donne rien (PDF scanné).
+  est envoyé au modèle texte. Le PDF brut n'est envoyé (en vision, par lots
+  de 5 pages max) que si l'extraction ne donne rien (PDF scanné).
 - Les photos de cours sont redimensionnées à 1600 px de large maximum avant
   envoi en base64.
 - Toute fiche ou lot de questions généré est **mis en cache en base** : il
   n'est jamais régénéré automatiquement.
 - Une seule génération à la fois, avec indicateur de progression.
 - Les erreurs 429 (quota atteint) sont gérées avec un retry exponentiel puis
-  un message clair invitant à réessayer le lendemain.
+  un message clair invitant à réessayer plus tard ; les 5xx (modèle
+  momentanément indisponible) sont retentés de la même façon.
 - Le fichier original est supprimé du Storage après extraction du texte
   (sauf option "conserver le document", désactivée par défaut), pour rester
   sous la limite de 1 Go du plan gratuit Supabase.

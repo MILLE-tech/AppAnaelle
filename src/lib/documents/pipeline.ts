@@ -7,6 +7,7 @@ import { resizeImageForVision } from "@/lib/image/resize";
 
 const ACCEPTED_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const MAX_IMAGES_PER_VISION_CALL = 5;
 
 export type DocumentRow = Database["public"]["Tables"]["documents"]["Row"];
 type Supabase = ReturnType<typeof createClient>;
@@ -126,13 +127,22 @@ export async function processDocument(
       } else {
         callbacks.onStage(`PDF scanné détecté, extraction par vision (${result.pageCount} page(s))...`);
         const images = await renderPdfPagesToImages(file);
-        extractedText = await callVisionExtraction(
-          document.id,
-          images.map((dataUrl) => ({
-            base64: dataUrl.split(",", 2)[1],
-            mimeType: "image/jpeg",
-          }))
-        );
+        const payloads = images.map((dataUrl) => ({
+          base64: dataUrl.split(",", 2)[1],
+          mimeType: "image/jpeg",
+        }));
+
+        // Le modèle vision accepte au maximum 5 images par appel : on
+        // découpe les documents plus longs en lots traités séquentiellement.
+        const textChunks: string[] = [];
+        for (let i = 0; i < payloads.length; i += MAX_IMAGES_PER_VISION_CALL) {
+          const chunk = payloads.slice(i, i + MAX_IMAGES_PER_VISION_CALL);
+          callbacks.onStage(
+            `PDF scanné détecté, extraction par vision (pages ${i + 1} à ${i + chunk.length}/${payloads.length})...`
+          );
+          textChunks.push(await callVisionExtraction(document.id, chunk));
+        }
+        extractedText = textChunks.join("\n\n");
         extractionMethod = "pdf_vision";
       }
     } else {

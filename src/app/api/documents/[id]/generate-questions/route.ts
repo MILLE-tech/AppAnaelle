@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, GeminiQuotaError, GeminiOverloadedError } from "@/lib/gemini/client";
-import { buildQuestionsPrompt, QUESTIONS_RESPONSE_SCHEMA } from "@/lib/gemini/prompts";
+import { generateChat, GroqQuotaError, GroqOverloadedError, textModel } from "@/lib/groq/client";
+import { buildQuestionsPrompt } from "@/lib/groq/prompts";
 import type { QuestionType } from "@/types/database.types";
 
-// Laisse le temps aux retries (429/503) de Gemini d'aboutir avant que
+// Laisse le temps aux retries (429/5xx) de Groq d'aboutir avant que
 // Vercel ne tue la fonction (10s par défaut sur le plan Hobby).
 export const maxDuration = 60;
 
@@ -77,15 +77,19 @@ export async function POST(
     return NextResponse.json({ questionSet: existingSet, questions: existingQuestions ?? [] });
   }
 
+  const model = textModel();
+
   try {
-    const raw = await generateContent({
-      parts: [
-        { text: buildQuestionsPrompt(questionType, count) },
-        { text: `\n\nTexte du cours :\n"""\n${document.extracted_text.slice(0, 60000)}\n"""` },
+    const raw = await generateChat({
+      model,
+      messages: [
+        {
+          role: "user",
+          content: `${buildQuestionsPrompt(questionType, count)}\n\nTexte du cours :\n"""\n${document.extracted_text.slice(0, 60000)}\n"""`,
+        },
       ],
-      responseMimeType: "application/json",
-      responseSchema: QUESTIONS_RESPONSE_SCHEMA,
-      maxOutputTokens: 8192,
+      jsonMode: true,
+      maxTokens: 8192,
     });
 
     let payload: { questions: RawQuestion[] };
@@ -93,7 +97,7 @@ export async function POST(
       payload = JSON.parse(raw);
     } catch {
       return NextResponse.json(
-        { error: "Réponse Gemini invalide, réessaie." },
+        { error: "Réponse du modèle invalide, réessaie." },
         { status: 502 }
       );
     }
@@ -101,12 +105,10 @@ export async function POST(
     const rawQuestions = payload.questions;
     if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
       return NextResponse.json(
-        { error: "Réponse Gemini incomplète, réessaie." },
+        { error: "Réponse du modèle incomplète, réessaie." },
         { status: 502 }
       );
     }
-
-    const modelUsed = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
 
     const { data: questionSet, error: setError } = await supabase
       .from("question_sets")
@@ -116,7 +118,7 @@ export async function POST(
         user_id: user.id,
         question_type: questionType,
         requested_count: count,
-        model_used: modelUsed,
+        model_used: model,
       })
       .select()
       .single();
@@ -149,10 +151,10 @@ export async function POST(
 
     return NextResponse.json({ questionSet, questions });
   } catch (err) {
-    if (err instanceof GeminiQuotaError) {
+    if (err instanceof GroqQuotaError) {
       return NextResponse.json({ error: err.message }, { status: 429 });
     }
-    if (err instanceof GeminiOverloadedError) {
+    if (err instanceof GroqOverloadedError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }
     const message = err instanceof Error ? err.message : "Erreur inconnue.";

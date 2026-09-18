@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, GeminiQuotaError, GeminiOverloadedError } from "@/lib/gemini/client";
+import { generateChat, GroqQuotaError, GroqOverloadedError, visionModel } from "@/lib/groq/client";
+import { EXTRACTION_PROMPT } from "@/lib/groq/prompts";
 
-// Laisse le temps aux retries (429/503) de Gemini d'aboutir avant que
+// Laisse le temps aux retries (429/5xx) de Groq d'aboutir avant que
 // Vercel ne tue la fonction (10s par défaut sur le plan Hobby).
 export const maxDuration = 60;
 
@@ -10,12 +11,6 @@ interface ImagePayload {
   base64: string;
   mimeType: string;
 }
-
-const EXTRACTION_PROMPT = `Transcris fidèlement tout le texte visible sur ces pages de cours (en français).
-Ne résume pas, ne reformule pas, ne commente pas : recopie le contenu tel quel.
-Conserve la structure (titres, listes, tableaux) sous forme de texte brut lisible.
-Si une portion est totalement illisible, ignore-la sans l'inventer.
-Réponds uniquement avec le texte transcrit, sans préambule.`;
 
 export async function POST(
   request: Request,
@@ -45,31 +40,37 @@ export async function POST(
   if (!images?.length) {
     return NextResponse.json({ error: "Aucune image fournie." }, { status: 400 });
   }
-  if (images.length > 20) {
+  if (images.length > 5) {
     return NextResponse.json(
-      { error: "Trop de pages pour une extraction en un seul appel (max 20)." },
+      { error: "Trop de pages pour une extraction en un seul appel (max 5)." },
       { status: 400 }
     );
   }
 
   try {
-    const text = await generateContent({
-      parts: [
-        { text: EXTRACTION_PROMPT },
-        ...images.map((image) => ({
-          inlineData: { mimeType: image.mimeType, data: image.base64 },
-        })),
+    const text = await generateChat({
+      model: visionModel(),
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: EXTRACTION_PROMPT },
+            ...images.map((image) => ({
+              type: "image_url" as const,
+              image_url: { url: `data:${image.mimeType};base64,${image.base64}` },
+            })),
+          ],
+        },
       ],
-      responseMimeType: "text/plain",
-      maxOutputTokens: 16384,
+      maxTokens: 8192,
     });
 
     return NextResponse.json({ text });
   } catch (err) {
-    if (err instanceof GeminiQuotaError) {
+    if (err instanceof GroqQuotaError) {
       return NextResponse.json({ error: err.message }, { status: 429 });
     }
-    if (err instanceof GeminiOverloadedError) {
+    if (err instanceof GroqOverloadedError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }
     const message = err instanceof Error ? err.message : "Erreur inconnue.";

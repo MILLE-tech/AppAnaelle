@@ -45,7 +45,7 @@ export async function extractTextFromPdf(file: File): Promise<PdfExtractionResul
 }
 
 // Rendu de chaque page du PDF en image (utilisé uniquement en secours pour
-// un PDF scanné, avant envoi à Gemini vision).
+// un PDF scanné, avant envoi au modèle vision).
 export async function renderPdfPagesToImages(
   file: File,
   maxWidth = 1600

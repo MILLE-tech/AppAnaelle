@@ -41,7 +41,7 @@ export function DocumentsPanel({
   }
 
   // Traite les fichiers un par un (jamais en parallèle) : chaque fichier
-  // implique un appel Gemini potentiel, et le palier gratuit est limité.
+  // implique un appel au modèle potentiel, et le palier gratuit est limité.
   async function handleFilesSelected(files: File[], keepOriginal: boolean) {
     setIsProcessing(true);
     const supabase = createClient();
