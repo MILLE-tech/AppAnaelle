@@ -7,7 +7,7 @@ export interface ResizedImage {
   mimeType: string;
 }
 
-// Redimensionne l'image à 1600px de large max avant envoi à Gemini vision,
+// Redimensionne l'image à 1600px de large max avant envoi au modèle vision,
 // pour limiter la consommation de tokens (et donc le quota gratuit).
 export async function resizeImageForVision(file: File): Promise<ResizedImage> {
   const bitmap = await createImageBitmap(file);

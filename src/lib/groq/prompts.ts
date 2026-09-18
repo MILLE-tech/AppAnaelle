@@ -19,18 +19,8 @@ Consignes :
 - Sois synthétique : privilégie des listes à puces courtes plutôt que des paragraphes longs.
 - N'ajoute aucun texte en dehors de la structure demandée (pas de préambule, pas de conclusion).
 
-Réponds uniquement avec un objet JSON respectant le schéma fourni, où :
-- "title" est un titre court (5 à 8 mots) résumant le sujet de la fiche.
-- "content_markdown" contient la fiche complète au format Markdown décrit ci-dessus.`;
-
-export const SHEET_RESPONSE_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    title: { type: "STRING" },
-    content_markdown: { type: "STRING" },
-  },
-  required: ["title", "content_markdown"],
-} as const;
+Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après, de la forme exacte :
+{"title": "titre court (5 à 8 mots) résumant le sujet", "content_markdown": "la fiche complète au format Markdown décrit ci-dessus"}`;
 
 const QUESTION_TYPE_INSTRUCTIONS: Record<"true_false" | "mcq" | "open", string> = {
   true_false: `Génère des questions VRAI/FAUX. Pour chaque question :
@@ -64,28 +54,10 @@ Consignes générales :
 - Varie les questions : ne répète pas la même idée sous des formulations différentes.
 - Formulations claires et sans ambiguïté.
 
-Réponds uniquement avec un objet JSON respectant le schéma fourni : un tableau "questions" contenant exactement ${count} éléments.`;
+Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après, de la forme exacte :
+{"questions": [{"prompt": "...", "options": ["...", "...", "...", "..."], "correct_answer": "...", "explanation": "..."}, ...]}
+contenant exactement ${count} éléments dans le tableau "questions".`;
 }
-
-export const QUESTIONS_RESPONSE_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    questions: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          prompt: { type: "STRING" },
-          options: { type: "ARRAY", items: { type: "STRING" } },
-          correct_answer: { type: "STRING" },
-          explanation: { type: "STRING" },
-        },
-        required: ["prompt", "options", "correct_answer", "explanation"],
-      },
-    },
-  },
-  required: ["questions"],
-} as const;
 
 export function buildOpenGradingPrompt(
   question: string,
@@ -103,14 +75,12 @@ Corrige cette réponse :
 - Donne une note sur 10 ("score"), juste et cohérente avec les éléments attendus.
 - Rédige un retour ("feedback") bienveillant, jamais cassant, en français : commence par ce qui est réussi, puis indique précisément ce qui manque ou pourrait être amélioré, en 2 à 4 phrases.
 
-Réponds uniquement avec un objet JSON respectant le schéma fourni.`;
+Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après, de la forme exacte :
+{"score": 0, "feedback": "..."}`;
 }
 
-export const OPEN_GRADING_RESPONSE_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    score: { type: "NUMBER" },
-    feedback: { type: "STRING" },
-  },
-  required: ["score", "feedback"],
-} as const;
+export const EXTRACTION_PROMPT = `Transcris fidèlement tout le texte visible sur ces pages de cours (en français).
+Ne résume pas, ne reformule pas, ne commente pas : recopie le contenu tel quel.
+Conserve la structure (titres, listes, tableaux) sous forme de texte brut lisible.
+Si une portion est totalement illisible, ignore-la sans l'inventer.
+Réponds uniquement avec le texte transcrit, sans préambule.`;

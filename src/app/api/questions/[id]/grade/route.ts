@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, GeminiQuotaError, GeminiOverloadedError } from "@/lib/gemini/client";
-import { buildOpenGradingPrompt, OPEN_GRADING_RESPONSE_SCHEMA } from "@/lib/gemini/prompts";
+import { generateChat, GroqQuotaError, GroqOverloadedError, textModel } from "@/lib/groq/client";
+import { buildOpenGradingPrompt } from "@/lib/groq/prompts";
 
-// Laisse le temps aux retries (429/503) de Gemini d'aboutir avant que
+// Laisse le temps aux retries (429/5xx) de Groq d'aboutir avant que
 // Vercel ne tue la fonction (10s par défaut sur le plan Hobby).
 export const maxDuration = 60;
 
@@ -41,36 +41,37 @@ export async function POST(
   }
 
   try {
-    const raw = await generateContent({
-      parts: [
+    const raw = await generateChat({
+      model: textModel(),
+      messages: [
         {
-          text: buildOpenGradingPrompt(
+          role: "user",
+          content: buildOpenGradingPrompt(
             question.prompt,
             question.explanation ?? "",
             answer.slice(0, 4000)
           ),
         },
       ],
-      responseMimeType: "application/json",
-      responseSchema: OPEN_GRADING_RESPONSE_SCHEMA,
-      maxOutputTokens: 1024,
+      jsonMode: true,
+      maxTokens: 1024,
     });
 
     let payload: { score: number; feedback: string };
     try {
       payload = JSON.parse(raw);
     } catch {
-      return NextResponse.json({ error: "Réponse Gemini invalide, réessaie." }, { status: 502 });
+      return NextResponse.json({ error: "Réponse du modèle invalide, réessaie." }, { status: 502 });
     }
 
     const score = Math.max(0, Math.min(10, Number(payload.score) || 0));
 
     return NextResponse.json({ score, feedback: payload.feedback });
   } catch (err) {
-    if (err instanceof GeminiQuotaError) {
+    if (err instanceof GroqQuotaError) {
       return NextResponse.json({ error: err.message }, { status: 429 });
     }
-    if (err instanceof GeminiOverloadedError) {
+    if (err instanceof GroqOverloadedError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }
     const message = err instanceof Error ? err.message : "Erreur inconnue.";
