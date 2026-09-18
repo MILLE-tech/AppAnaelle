@@ -88,6 +88,61 @@ export async function signup(
   };
 }
 
+export async function requestPasswordReset(
+  _prevState: AuthActionState,
+  formData: FormData
+): Promise<AuthActionState> {
+  const email = String(formData.get("email") ?? "").trim();
+
+  if (!email) {
+    return { error: "Renseigne ton adresse email." };
+  }
+
+  const supabase = await createClient();
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl()}/auth/confirm?next=/reinitialiser-mot-de-passe`,
+  });
+
+  // Message générique volontaire : ne pas révéler si l'email existe ou non.
+  return {
+    error: null,
+    info: "Si un compte existe avec cet email, tu vas recevoir un lien pour réinitialiser ton mot de passe.",
+  };
+}
+
+export async function updatePassword(
+  _prevState: AuthActionState,
+  formData: FormData
+): Promise<AuthActionState> {
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  if (password.length < 8) {
+    return { error: "Le mot de passe doit contenir au moins 8 caractères." };
+  }
+  if (password !== confirmPassword) {
+    return { error: "Les deux mots de passe ne correspondent pas." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      error: "Ce lien de réinitialisation n'est plus valide. Redemande un email.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    return { error: "Impossible de mettre à jour le mot de passe. Réessaie." };
+  }
+
+  redirect("/dashboard");
+}
+
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
