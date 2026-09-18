@@ -9,6 +9,7 @@ const PROTECTED_PREFIXES = [
   "/reviser",
   "/fiches",
   "/historique",
+  "/questions",
 ];
 const AUTH_PREFIXES = ["/login", "/signup"];
 
