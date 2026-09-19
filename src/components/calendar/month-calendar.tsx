@@ -51,6 +51,14 @@ function formatTime(time: string | null): string {
   return time.slice(0, 5);
 }
 
+// event_date est une date pure ("YYYY-MM-DD") : la parser via `new Date(string)`
+// l'interprète en UTC, ce qui peut la faire retomber la veille une fois reconvertie
+// en heure locale. On construit donc la Date à partir des composants locaux.
+function parseDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 interface FormState {
   eventId: string | null; // null = création
   date: string;
@@ -283,7 +291,7 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
             </div>
             <h3 className="mt-1 text-xl font-semibold">{detailEvent.title}</h3>
             <p className="mt-1 text-sm text-muted">
-              {new Date(detailEvent.event_date).toLocaleDateString("fr-FR", {
+              {parseDateKey(detailEvent.event_date).toLocaleDateString("fr-FR", {
                 weekday: "long",
                 day: "numeric",
                 month: "long",
