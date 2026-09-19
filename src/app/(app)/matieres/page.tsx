@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+import { getStorageUsage } from "@/lib/storage/usage";
 import { SubjectForm } from "@/components/subjects/subject-form";
 import { SubjectCard } from "@/components/subjects/subject-card";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { StorageUsageBar } from "@/components/ui/storage-usage-bar";
 
 export default async function MatieresPage() {
   const supabase = await createClient();
@@ -17,13 +19,18 @@ export default async function MatieresPage() {
   }
 
   const subjects = Array.isArray(data) ? data : [];
+  const storageUsage = await getStorageUsage();
 
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="text-3xl font-semibold">Matières</h1>
       <p className="mt-1 text-muted">Crée une matière puis ajoute tes documents de cours.</p>
 
-      <Card className="mt-6">
+      <div className="mt-6">
+        <StorageUsageBar usage={storageUsage} />
+      </div>
+
+      <Card className="mt-4">
         <SubjectForm />
       </Card>
 

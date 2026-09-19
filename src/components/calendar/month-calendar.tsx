@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,8 @@ export interface CalendarEvent {
   subject_id: string;
   title: string;
   event_date: string;
+  time: string | null;
+  description: string | null;
   coefficient: number | null;
 }
 
@@ -43,6 +46,33 @@ function buildMonthGrid(monthStart: Date): Date[] {
   });
 }
 
+function formatTime(time: string | null): string {
+  if (!time) return "";
+  return time.slice(0, 5);
+}
+
+interface FormState {
+  eventId: string | null; // null = création
+  date: string;
+  subjectId: string;
+  title: string;
+  time: string;
+  description: string;
+  coefficient: string;
+}
+
+function emptyForm(dateKey: string, defaultSubjectId: string): FormState {
+  return {
+    eventId: null,
+    date: dateKey,
+    subjectId: defaultSubjectId,
+    title: "",
+    time: "",
+    description: "",
+    coefficient: "",
+  };
+}
+
 interface MonthCalendarProps {
   userId: string;
   subjects: SubjectOption[];
@@ -52,10 +82,8 @@ interface MonthCalendarProps {
 export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendarProps) {
   const [events, setEvents] = useState(initialEvents);
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
-  const [formDate, setFormDate] = useState<string | null>(null);
-  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
-  const [title, setTitle] = useState("");
-  const [coefficient, setCoefficient] = useState("");
+  const [detailEventId, setDetailEventId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,42 +97,75 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
     for (const event of events) {
       (map[event.event_date] ??= []).push(event);
     }
+    for (const list of Object.values(map)) {
+      list.sort((a, b) => {
+        if (!a.time && !b.time) return 0;
+        if (!a.time) return 1;
+        if (!b.time) return -1;
+        return a.time.localeCompare(b.time);
+      });
+    }
     return map;
   }, [events]);
 
   const grid = useMemo(() => buildMonthGrid(month), [month]);
   const today = toDateKey(new Date());
+  const detailEvent = detailEventId ? (events.find((e) => e.id === detailEventId) ?? null) : null;
 
-  function openForm(dateKey: string) {
-    setFormDate(dateKey);
-    setTitle("");
-    setCoefficient("");
-    setSubjectId(subjects[0]?.id ?? "");
+  function openCreateForm(dateKey: string) {
+    setForm(emptyForm(dateKey, subjects[0]?.id ?? ""));
+    setError(null);
+  }
+
+  function openEditForm(event: CalendarEvent) {
+    setDetailEventId(null);
+    setForm({
+      eventId: event.id,
+      date: event.event_date,
+      subjectId: event.subject_id,
+      title: event.title,
+      time: event.time ?? "",
+      description: event.description ?? "",
+      coefficient: event.coefficient != null ? String(event.coefficient) : "",
+    });
     setError(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!formDate || !subjectId || !title.trim()) return;
+    if (!form || !form.subjectId || !form.title.trim()) return;
     setIsSaving(true);
     setError(null);
     try {
       const supabase = createClient();
-      const { data, error: insertError } = await supabase
-        .from("calendar_events")
-        .insert({
-          user_id: userId,
-          subject_id: subjectId,
-          title: title.trim(),
-          event_date: formDate,
-          coefficient: coefficient ? Number(coefficient) : null,
-        })
-        .select("id, subject_id, title, event_date, coefficient")
-        .single();
+      const payload = {
+        subject_id: form.subjectId,
+        title: form.title.trim(),
+        event_date: form.date,
+        time: form.time || null,
+        description: form.description.trim() || null,
+        coefficient: form.coefficient ? Number(form.coefficient) : null,
+      };
 
-      if (insertError || !data) throw new Error("Impossible d'ajouter l'évaluation.");
-      setEvents((prev) => [...prev, data]);
-      setFormDate(null);
+      if (form.eventId) {
+        const { data, error: updateError } = await supabase
+          .from("calendar_events")
+          .update(payload)
+          .eq("id", form.eventId)
+          .select("id, subject_id, title, event_date, time, description, coefficient")
+          .single();
+        if (updateError || !data) throw new Error("Impossible de modifier l'évaluation.");
+        setEvents((prev) => prev.map((ev) => (ev.id === data.id ? data : ev)));
+      } else {
+        const { data, error: insertError } = await supabase
+          .from("calendar_events")
+          .insert({ user_id: userId, ...payload })
+          .select("id, subject_id, title, event_date, time, description, coefficient")
+          .single();
+        if (insertError || !data) throw new Error("Impossible d'ajouter l'évaluation.");
+        setEvents((prev) => [...prev, data]);
+      }
+      setForm(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inattendue.");
     } finally {
@@ -117,6 +178,7 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
     const supabase = createClient();
     await supabase.from("calendar_events").delete().eq("id", eventId);
     setEvents((prev) => prev.filter((e) => e.id !== eventId));
+    setDetailEventId(null);
   }
 
   return (
@@ -138,7 +200,7 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
           >
             <ChevronIcon className="h-4 w-4" />
           </button>
-          <Button onClick={() => openForm(today)} className="ml-1 !px-3 !py-2">
+          <Button onClick={() => openCreateForm(today)} className="ml-1 !px-3 !py-2">
             <PlusIcon className="h-4 w-4" />
             <span className="hidden sm:inline">Ajouter une évaluation</span>
           </Button>
@@ -161,7 +223,7 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
             return (
               <button
                 key={dateKey}
-                onClick={() => openForm(dateKey)}
+                onClick={() => openCreateForm(dateKey)}
                 className={clsx(
                   "flex min-h-20 flex-col items-start gap-1 border-b border-r border-surface-border p-1.5 text-left transition-colors hover:bg-white/5 sm:p-2",
                   !inMonth && "opacity-30"
@@ -181,12 +243,13 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
                       key={event.id}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDelete(event.id);
+                        setDetailEventId(event.id);
                       }}
                       className="truncate rounded px-1 py-0.5 text-[10px] font-medium text-white"
                       style={{ backgroundColor: subjectsById[event.subject_id]?.color ?? "#8b5cf6" }}
-                      title={`${event.title} — clique pour supprimer`}
+                      title={event.title}
                     >
+                      {event.time && <span className="mr-1 opacity-80">{formatTime(event.time)}</span>}
                       {event.title}
                     </span>
                   ))}
@@ -200,14 +263,61 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
         </div>
       </div>
 
-      {formDate && (
-        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/60 p-4 sm:items-center">
-          <form
-            onSubmit={handleSubmit}
+      {detailEvent && (
+        <div
+          className="fixed inset-0 z-30 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+          onClick={() => setDetailEventId(null)}
+        >
+          <div
             className="glass-panel w-full max-w-sm rounded-2xl p-5"
+            onClick={(e) => e.stopPropagation()}
           >
+            <div className="flex items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: subjectsById[detailEvent.subject_id]?.color ?? "#8b5cf6" }}
+              />
+              <p className="text-sm font-medium text-muted">
+                {subjectsById[detailEvent.subject_id]?.name ?? "Matière"}
+              </p>
+            </div>
+            <h3 className="mt-1 text-xl font-semibold">{detailEvent.title}</h3>
+            <p className="mt-1 text-sm text-muted">
+              {new Date(detailEvent.event_date).toLocaleDateString("fr-FR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+              {detailEvent.time && ` à ${formatTime(detailEvent.time)}`}
+              {detailEvent.coefficient != null && ` · coefficient ${detailEvent.coefficient}`}
+            </p>
+            {detailEvent.description && (
+              <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">
+                {detailEvent.description}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => openEditForm(detailEvent)}>
+                Modifier
+              </Button>
+              <Button variant="danger" onClick={() => handleDelete(detailEvent.id)}>
+                Supprimer
+              </Button>
+              <Link href={`/matieres/${detailEvent.subject_id}`} className="ml-auto">
+                <Button variant="ghost">Voir la matière →</Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {form && (
+        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/60 p-4 sm:items-center">
+          <form onSubmit={handleSubmit} className="glass-panel w-full max-w-sm rounded-2xl p-5">
             <h3 className="mb-4 text-lg font-semibold">
-              Ajouter une évaluation — {new Date(formDate).toLocaleDateString("fr-FR")}
+              {form.eventId ? "Modifier l'évaluation" : "Ajouter une évaluation"}
             </h3>
 
             <div className="flex flex-col gap-3">
@@ -215,8 +325,8 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
                 <Label htmlFor="subject">Matière</Label>
                 <select
                   id="subject"
-                  value={subjectId}
-                  onChange={(e) => setSubjectId(e.target.value)}
+                  value={form.subjectId}
+                  onChange={(e) => setForm({ ...form, subjectId: e.target.value })}
                   required
                   className="w-full rounded-xl border border-surface-border bg-white/[0.03] px-4 py-3 text-sm text-foreground outline-none focus:border-accent/60"
                 >
@@ -231,10 +341,42 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
                 <Label htmlFor="title">Intitulé</Label>
                 <Input
                   id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
                   placeholder="Ex : Contrôle de gestion"
                   required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="date">Date</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={form.date}
+                    onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="time">Heure (optionnel)</Label>
+                  <Input
+                    id="time"
+                    type="time"
+                    value={form.time}
+                    onChange={(e) => setForm({ ...form, time: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="description">Description (optionnel)</Label>
+                <textarea
+                  id="description"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  rows={3}
+                  placeholder="Sur quoi porte cette évaluation ?"
+                  className="w-full rounded-xl border border-surface-border bg-white/[0.03] px-4 py-3 text-sm text-foreground outline-none focus:border-accent/60"
                 />
               </div>
               <div>
@@ -244,8 +386,8 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
                   type="number"
                   min={0}
                   step={0.5}
-                  value={coefficient}
-                  onChange={(e) => setCoefficient(e.target.value)}
+                  value={form.coefficient}
+                  onChange={(e) => setForm({ ...form, coefficient: e.target.value })}
                 />
               </div>
             </div>
@@ -253,11 +395,11 @@ export function MonthCalendar({ userId, subjects, initialEvents }: MonthCalendar
             {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
             <div className="mt-5 flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setFormDate(null)}>
+              <Button type="button" variant="ghost" onClick={() => setForm(null)}>
                 Annuler
               </Button>
               <Button type="submit" disabled={isSaving || subjects.length === 0}>
-                {isSaving ? "Ajout..." : "Ajouter"}
+                {isSaving ? "Enregistrement..." : form.eventId ? "Enregistrer" : "Ajouter"}
               </Button>
             </div>
             {subjects.length === 0 && (

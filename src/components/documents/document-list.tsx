@@ -5,8 +5,8 @@ import Link from "next/link";
 import type { DocumentRow } from "@/lib/documents/pipeline";
 import { createClient } from "@/lib/supabase/client";
 import { clsx } from "@/lib/utils/clsx";
-import { EmptyState } from "@/components/ui/empty-state";
-import { QuestionSetsPanel, type QuestionSetSummary } from "@/components/documents/question-sets-panel";
+import { PdfViewerModal } from "@/components/ui/pdf-viewer-modal";
+import { formatDate } from "@/lib/utils/format";
 
 export interface SheetSummary {
   id: string;
@@ -30,38 +30,26 @@ const STATUS_CLASSES: Record<DocumentRow["status"], string> = {
   error: "bg-danger-soft text-danger",
 };
 
-const METHOD_LABELS: Record<string, string> = {
-  pdf_text: "Texte PDF",
-  pdf_vision: "PDF scanné (vision)",
-  image_vision: "Photo (vision)",
-};
-
 interface DocumentListProps {
   documents: DocumentRow[];
   sheetsByDocument: Record<string, SheetSummary>;
-  questionSetsByDocument: Record<string, QuestionSetSummary[]>;
   onDeleted: (id: string) => void;
   onSheetGenerated: (documentId: string, sheet: SheetSummary) => void;
-  onQuestionSetGenerated: (documentId: string, set: QuestionSetSummary) => void;
   disableGeneration: boolean;
 }
 
 export function DocumentList({
   documents,
   sheetsByDocument,
-  questionSetsByDocument,
   onDeleted,
   onSheetGenerated,
-  onQuestionSetGenerated,
   disableGeneration,
 }: DocumentListProps) {
   if (documents.length === 0) {
     return (
-      <EmptyState
-        icon={<UploadIcon className="h-6 w-6" />}
-        title="Aucun document pour l'instant"
-        description="Dépose un PDF ou une photo de cours ci-dessus pour générer une fiche de révision et des quiz."
-      />
+      <p className="py-6 text-center text-sm text-muted">
+        Aucun document pour l&apos;instant.
+      </p>
     );
   }
 
@@ -72,10 +60,8 @@ export function DocumentList({
           key={doc.id}
           doc={doc}
           sheet={sheetsByDocument[doc.id]}
-          questionSets={questionSetsByDocument[doc.id] ?? []}
           onDeleted={onDeleted}
           onSheetGenerated={onSheetGenerated}
-          onQuestionSetGenerated={onQuestionSetGenerated}
           disableGeneration={disableGeneration}
         />
       ))}
@@ -86,23 +72,21 @@ export function DocumentList({
 function DocumentItem({
   doc,
   sheet,
-  questionSets,
   onDeleted,
   onSheetGenerated,
-  onQuestionSetGenerated,
   disableGeneration,
 }: {
   doc: DocumentRow;
   sheet: SheetSummary | undefined;
-  questionSets: QuestionSetSummary[];
   onDeleted: (id: string) => void;
   onSheetGenerated: (documentId: string, sheet: SheetSummary) => void;
-  onQuestionSetGenerated: (documentId: string, set: QuestionSetSummary) => void;
   disableGeneration: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [isOpening, setIsOpening] = useState(false);
   const busy = ["uploading", "extracting", "analyzing"].includes(doc.status);
 
   function handleDelete() {
@@ -115,6 +99,23 @@ function DocumentItem({
       await supabase.from("documents").delete().eq("id", doc.id);
       onDeleted(doc.id);
     });
+  }
+
+  async function handleOpen() {
+    if (!doc.storage_path) return;
+    setIsOpening(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.storage
+        .from("course-documents")
+        .createSignedUrl(doc.storage_path, 300);
+      if (error || !data) throw new Error();
+      setViewerUrl(data.signedUrl);
+    } catch {
+      alert("Impossible d'ouvrir ce fichier.");
+    } finally {
+      setIsOpening(false);
+    }
   }
 
   async function handleGenerateSheet() {
@@ -152,21 +153,35 @@ function DocumentItem({
             )}
             {STATUS_LABELS[doc.status]}
           </span>
-          {doc.extraction_method && (
-            <span>{METHOD_LABELS[doc.extraction_method] ?? doc.extraction_method}</span>
-          )}
-          {doc.char_count != null && <span>{doc.char_count.toLocaleString("fr-FR")} caractères</span>}
+          <span>Ajouté le {formatDate(doc.created_at)}</span>
           {doc.status === "error" && doc.error_message && (
             <span className="text-danger">{doc.error_message}</span>
           )}
         </div>
 
         {doc.status === "ready" && (
-          <div className="mt-2 flex flex-col gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
+            {doc.storage_path ? (
+              <button
+                onClick={handleOpen}
+                disabled={isOpening}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:text-foreground disabled:opacity-50"
+              >
+                {isOpening ? "Ouverture..." : "Ouvrir"}
+              </button>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs text-muted opacity-60"
+                title="Fichier original non conservé"
+              >
+                Non consultable
+              </span>
+            )}
+
             {sheet ? (
               <Link
                 href={`/fiches/${sheet.id}`}
-                className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent hover:brightness-110"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent hover:brightness-110"
               >
                 Voir la fiche
               </Link>
@@ -174,21 +189,14 @@ function DocumentItem({
               <button
                 onClick={handleGenerateSheet}
                 disabled={isGenerating || disableGeneration}
-                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-surface-border px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:text-foreground disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:text-foreground disabled:opacity-50"
               >
-                {isGenerating ? "Génération de la fiche..." : "Générer la fiche"}
+                {isGenerating ? "Génération..." : "Générer une fiche"}
               </button>
             )}
-            {generationError && <p className="text-xs text-danger">{generationError}</p>}
-
-            <QuestionSetsPanel
-              documentId={doc.id}
-              sets={questionSets}
-              disabled={disableGeneration}
-              onSetCreated={onQuestionSetGenerated}
-            />
           </div>
         )}
+        {generationError && <p className="mt-1 text-xs text-danger">{generationError}</p>}
       </div>
       <button
         onClick={handleDelete}
@@ -198,21 +206,11 @@ function DocumentItem({
       >
         <TrashIcon className="h-4 w-4" />
       </button>
-    </li>
-  );
-}
 
-function UploadIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <path
-        d="M12 15V4m0 0 4 4m-4-4-4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+      {viewerUrl && (
+        <PdfViewerModal url={viewerUrl} title={doc.file_name} onClose={() => setViewerUrl(null)} />
+      )}
+    </li>
   );
 }
 

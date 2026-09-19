@@ -322,6 +322,7 @@ export interface Database {
           id: string;
           user_id: string;
           subject_id: string | null;
+          question_set_id: string | null;
           session_type: SessionType;
           total_questions: number;
           correct_count: number;
@@ -333,6 +334,7 @@ export interface Database {
           id?: string;
           user_id: string;
           subject_id?: string | null;
+          question_set_id?: string | null;
           session_type?: SessionType;
           total_questions?: number;
           correct_count?: number;
@@ -344,6 +346,7 @@ export interface Database {
           id?: string;
           user_id?: string;
           subject_id?: string | null;
+          question_set_id?: string | null;
           session_type?: SessionType;
           total_questions?: number;
           correct_count?: number;
@@ -357,6 +360,13 @@ export interface Database {
             columns: ["subject_id"];
             isOneToOne: false;
             referencedRelation: "subjects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "review_sessions_question_set_id_fkey";
+            columns: ["question_set_id"];
+            isOneToOne: false;
+            referencedRelation: "question_sets";
             referencedColumns: ["id"];
           },
         ];
@@ -422,6 +432,8 @@ export interface Database {
           subject_id: string;
           title: string;
           event_date: string;
+          time: string | null;
+          description: string | null;
           coefficient: number | null;
           created_at: string;
           updated_at: string;
@@ -432,6 +444,8 @@ export interface Database {
           subject_id: string;
           title: string;
           event_date: string;
+          time?: string | null;
+          description?: string | null;
           coefficient?: number | null;
           created_at?: string;
           updated_at?: string;
@@ -442,6 +456,8 @@ export interface Database {
           subject_id?: string;
           title?: string;
           event_date?: string;
+          time?: string | null;
+          description?: string | null;
           coefficient?: number | null;
           created_at?: string;
           updated_at?: string;
@@ -449,6 +465,109 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "calendar_events_subject_id_fkey";
+            columns: ["subject_id"];
+            isOneToOne: false;
+            referencedRelation: "subjects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      annales_years: {
+        Row: {
+          id: string;
+          user_id: string;
+          year: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          year: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          year?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      annales: {
+        Row: {
+          id: string;
+          user_id: string;
+          subject_id: string;
+          year: number;
+          file_name: string;
+          file_path: string;
+          file_size: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          subject_id: string;
+          year: number;
+          file_name: string;
+          file_path: string;
+          file_size: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          subject_id?: string;
+          year?: number;
+          file_name?: string;
+          file_path?: string;
+          file_size?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "annales_subject_id_fkey";
+            columns: ["subject_id"];
+            isOneToOne: false;
+            referencedRelation: "subjects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      useful_documents: {
+        Row: {
+          id: string;
+          subject_id: string;
+          user_id: string;
+          file_name: string;
+          mime_type: string;
+          storage_path: string;
+          file_size: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          subject_id: string;
+          user_id: string;
+          file_name: string;
+          mime_type: string;
+          storage_path: string;
+          file_size: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          subject_id?: string;
+          user_id?: string;
+          file_name?: string;
+          mime_type?: string;
+          storage_path?: string;
+          file_size?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "useful_documents_subject_id_fkey";
             columns: ["subject_id"];
             isOneToOne: false;
             referencedRelation: "subjects";

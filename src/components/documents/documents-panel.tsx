@@ -5,15 +5,13 @@ import { createClient } from "@/lib/supabase/client";
 import { processDocument, type DocumentRow } from "@/lib/documents/pipeline";
 import { UploadZone } from "@/components/documents/upload-zone";
 import { DocumentList, type SheetSummary } from "@/components/documents/document-list";
-import type { QuestionSetSummary } from "@/components/documents/question-sets-panel";
-import { Card } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 
 interface DocumentsPanelProps {
   subjectId: string;
   userId: string;
   initialDocuments: DocumentRow[];
   initialSheetsByDocument: Record<string, SheetSummary>;
-  initialQuestionSetsByDocument: Record<string, QuestionSetSummary[]>;
 }
 
 export function DocumentsPanel({
@@ -21,13 +19,9 @@ export function DocumentsPanel({
   userId,
   initialDocuments,
   initialSheetsByDocument,
-  initialQuestionSetsByDocument,
 }: DocumentsPanelProps) {
   const [documents, setDocuments] = useState<DocumentRow[]>(initialDocuments);
   const [sheetsByDocument, setSheetsByDocument] = useState(initialSheetsByDocument);
-  const [questionSetsByDocument, setQuestionSetsByDocument] = useState(
-    initialQuestionSetsByDocument
-  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<{ index: number; total: number; stage: string } | null>(
     null
@@ -74,35 +68,26 @@ export function DocumentsPanel({
     setSheetsByDocument((prev) => ({ ...prev, [documentId]: sheet }));
   }
 
-  function handleQuestionSetGenerated(documentId: string, set: QuestionSetSummary) {
-    setQuestionSetsByDocument((prev) => ({
-      ...prev,
-      [documentId]: [...(prev[documentId] ?? []), set],
-    }));
-  }
-
   const progressLabel = progress
     ? `Document ${progress.index}/${progress.total} — ${progress.stage}`
     : null;
 
   return (
-    <div className="flex flex-col gap-4">
-      <UploadZone
-        onFilesSelected={handleFilesSelected}
-        disabled={isProcessing}
-        progressLabel={progressLabel}
-      />
-      <Card>
+    <CollapsibleCard title="Cours" count={documents.length}>
+      <div className="flex flex-col gap-4">
+        <UploadZone
+          onFilesSelected={handleFilesSelected}
+          disabled={isProcessing}
+          progressLabel={progressLabel}
+        />
         <DocumentList
           documents={documents}
           sheetsByDocument={sheetsByDocument}
-          questionSetsByDocument={questionSetsByDocument}
           onDeleted={handleDeleted}
           onSheetGenerated={handleSheetGenerated}
-          onQuestionSetGenerated={handleQuestionSetGenerated}
           disableGeneration={isProcessing}
         />
-      </Card>
-    </div>
+      </div>
+    </CollapsibleCard>
   );
 }

@@ -8,6 +8,7 @@ import { logout } from "@/lib/actions/auth";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Accueil", icon: HomeIcon },
   { href: "/matieres", label: "Matières", icon: BookIcon },
+  { href: "/annales", label: "Annales", icon: ArchiveIcon },
   { href: "/calendrier", label: "Calendrier", icon: CalendarIcon },
   { href: "/historique", label: "Historique", icon: ChartIcon },
 ];
@@ -154,6 +155,20 @@ function ChartIcon({ className }: { className?: string }) {
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ArchiveIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="4" y="4.5" width="16" height="4" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M5 8.5V18a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18V8.5M10 13h4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
       />
     </svg>
   );
