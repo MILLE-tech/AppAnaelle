@@ -23,6 +23,7 @@ interface ReviewSessionProps {
   sessionType: SessionType;
   backHref: string;
   backLabel: string;
+  questionSetId?: string | null;
 }
 
 type Feedback = {
@@ -39,6 +40,7 @@ export function ReviewSession({
   sessionType,
   backHref,
   backLabel,
+  questionSetId = null,
 }: ReviewSessionProps) {
   const supabase = useRef(createClient()).current;
   const startedAt = useRef(Date.now());
@@ -53,7 +55,7 @@ export function ReviewSession({
   const [finished, setFinished] = useState(false);
 
   useEffect(() => {
-    createReviewSession(supabase, userId, subjectId, sessionType).then(setSessionId);
+    createReviewSession(supabase, userId, subjectId, sessionType, questionSetId).then(setSessionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

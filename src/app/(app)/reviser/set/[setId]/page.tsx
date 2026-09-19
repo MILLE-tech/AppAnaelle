@@ -38,6 +38,7 @@ export default async function ReviewSetPage({
         sessionType="normal"
         backHref={`/matieres/${questionSet.subject_id}`}
         backLabel="Retour à la matière"
+        questionSetId={questionSet.id}
       />
     </div>
   );

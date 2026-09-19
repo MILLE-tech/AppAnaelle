@@ -9,7 +9,15 @@ import type { QuestionType } from "@/types/database.types";
 export const maxDuration = 60;
 
 const VALID_TYPES: QuestionType[] = ["true_false", "mcq", "open"];
-const VALID_COUNTS = [5, 10, 20];
+const VALID_COUNTS = [10, 20, 40, 50, 80, 100];
+
+// Un lot de plus de 20 questions dépasserait la sortie max d'un seul appel
+// Groq de façon fiable : on génère par paquets de 20 maximum, chacun
+// persisté immédiatement en base. Un appel suivant sur le même lot reprend
+// automatiquement là où il s'est arrêté (voir la recherche de lot existant
+// ci-dessous), qu'il s'agisse du prochain paquet normal ou d'une reprise
+// après un échec réseau/quota en cours de route.
+const BATCH_SIZE = 20;
 
 interface RawQuestion {
   prompt: string;
@@ -57,27 +65,68 @@ export async function POST(
     );
   }
 
+  const model = textModel();
+
   // Un lot de questions n'est jamais régénéré automatiquement : si un lot
-  // identique (même document, type, nombre) existe déjà, on le renvoie.
-  const { data: existingSet } = await supabase
-    .from("question_sets")
-    .select("*")
-    .eq("document_id", id)
-    .eq("question_type", questionType)
-    .eq("requested_count", count)
-    .maybeSingle();
-
-  if (existingSet) {
-    const { data: existingQuestions } = await supabase
-      .from("questions")
+  // identique (même document, type, nombre) existe déjà, on reprend sa
+  // génération s'il est incomplet, ou on le renvoie tel quel s'il est déjà
+  // complet — jamais un nouvel appel au modèle dans ce cas.
+  let questionSet = (
+    await supabase
+      .from("question_sets")
       .select("*")
-      .eq("question_set_id", existingSet.id)
-      .order("order_index", { ascending: true });
+      .eq("document_id", id)
+      .eq("question_type", questionType)
+      .eq("requested_count", count)
+      .maybeSingle()
+  ).data;
 
-    return NextResponse.json({ questionSet: existingSet, questions: existingQuestions ?? [] });
+  if (!questionSet) {
+    const { data: created, error: setError } = await supabase
+      .from("question_sets")
+      .insert({
+        document_id: id,
+        subject_id: document.subject_id,
+        user_id: user.id,
+        question_type: questionType,
+        requested_count: count,
+        model_used: model,
+      })
+      .select()
+      .single();
+
+    if (setError || !created) {
+      return NextResponse.json({ error: "Impossible d'enregistrer le lot de questions." }, { status: 500 });
+    }
+    questionSet = created;
   }
 
-  const model = textModel();
+  const { count: existingCount } = await supabase
+    .from("questions")
+    .select("id", { count: "exact", head: true })
+    .eq("question_set_id", questionSet.id);
+
+  const alreadyGenerated = existingCount ?? 0;
+
+  if (alreadyGenerated >= count) {
+    const { data: allQuestions } = await supabase
+      .from("questions")
+      .select("*")
+      .eq("question_set_id", questionSet.id)
+      .order("order_index", { ascending: true });
+
+    return NextResponse.json({
+      questionSet,
+      newQuestions: [],
+      questions: allQuestions ?? [],
+      generatedCount: count,
+      totalCount: count,
+      done: true,
+    });
+  }
+
+  const remaining = count - alreadyGenerated;
+  const batchSize = Math.min(remaining, BATCH_SIZE);
 
   try {
     const raw = await generateChat({
@@ -85,7 +134,7 @@ export async function POST(
       messages: [
         {
           role: "user",
-          content: `${buildQuestionsPrompt(questionType, count)}\n\nTexte du cours :\n"""\n${document.extracted_text.slice(0, 60000)}\n"""`,
+          content: `${buildQuestionsPrompt(questionType, batchSize)}\n\nTexte du cours :\n"""\n${document.extracted_text.slice(0, 60000)}\n"""`,
         },
       ],
       jsonMode: true,
@@ -110,24 +159,7 @@ export async function POST(
       );
     }
 
-    const { data: questionSet, error: setError } = await supabase
-      .from("question_sets")
-      .insert({
-        document_id: id,
-        subject_id: document.subject_id,
-        user_id: user.id,
-        question_type: questionType,
-        requested_count: count,
-        model_used: model,
-      })
-      .select()
-      .single();
-
-    if (setError || !questionSet) {
-      return NextResponse.json({ error: "Impossible d'enregistrer le lot de questions." }, { status: 500 });
-    }
-
-    const rowsToInsert = rawQuestions.slice(0, count).map((q, index) => ({
+    const rowsToInsert = rawQuestions.slice(0, batchSize).map((q, index) => ({
       question_set_id: questionSet.id,
       subject_id: document.subject_id,
       user_id: user.id,
@@ -136,28 +168,44 @@ export async function POST(
       options: questionType === "mcq" ? q.options : null,
       correct_answer: questionType === "open" ? null : q.correct_answer,
       explanation: q.explanation ?? null,
-      order_index: index,
+      order_index: alreadyGenerated + index,
     }));
 
-    const { data: questions, error: questionsError } = await supabase
+    const { data: newQuestions, error: questionsError } = await supabase
       .from("questions")
       .insert(rowsToInsert)
       .select();
 
-    if (questionsError || !questions) {
-      await supabase.from("question_sets").delete().eq("id", questionSet.id);
+    if (questionsError || !newQuestions) {
       return NextResponse.json({ error: "Impossible d'enregistrer les questions." }, { status: 500 });
     }
 
-    return NextResponse.json({ questionSet, questions });
+    const generatedCount = alreadyGenerated + newQuestions.length;
+
+    return NextResponse.json({
+      questionSet,
+      newQuestions,
+      generatedCount,
+      totalCount: count,
+      done: generatedCount >= count,
+    });
   } catch (err) {
     if (err instanceof GroqQuotaError) {
-      return NextResponse.json({ error: err.message }, { status: 429 });
+      return NextResponse.json(
+        { error: err.message, questionSet, generatedCount: alreadyGenerated, totalCount: count },
+        { status: 429 }
+      );
     }
     if (err instanceof GroqOverloadedError) {
-      return NextResponse.json({ error: err.message }, { status: 503 });
+      return NextResponse.json(
+        { error: err.message, questionSet, generatedCount: alreadyGenerated, totalCount: count },
+        { status: 503 }
+      );
     }
     const message = err instanceof Error ? err.message : "Erreur inconnue.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message, questionSet, generatedCount: alreadyGenerated, totalCount: count },
+      { status: 500 }
+    );
   }
 }

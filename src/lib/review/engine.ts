@@ -18,11 +18,17 @@ export async function createReviewSession(
   supabase: Supabase,
   userId: string,
   subjectId: string | null,
-  sessionType: SessionType
+  sessionType: SessionType,
+  questionSetId: string | null = null
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("review_sessions")
-    .insert({ user_id: userId, subject_id: subjectId, session_type: sessionType })
+    .insert({
+      user_id: userId,
+      subject_id: subjectId,
+      session_type: sessionType,
+      question_set_id: questionSetId,
+    })
     .select("id")
     .single();
 

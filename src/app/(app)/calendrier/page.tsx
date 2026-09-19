@@ -17,7 +17,7 @@ export default async function CalendrierPage() {
 
   const { data: events } = await supabase
     .from("calendar_events")
-    .select("id, subject_id, title, event_date, coefficient");
+    .select("id, subject_id, title, event_date, time, description, coefficient");
 
   return (
     <div className="mx-auto max-w-4xl">

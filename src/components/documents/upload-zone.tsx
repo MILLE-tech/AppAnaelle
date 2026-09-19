@@ -12,7 +12,7 @@ interface UploadZoneProps {
 export function UploadZone({ onFilesSelected, disabled, progressLabel }: UploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [keepOriginal, setKeepOriginal] = useState(false);
+  const [keepOriginal, setKeepOriginal] = useState(true);
 
   function handleFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
@@ -70,7 +70,8 @@ export function UploadZone({ onFilesSelected, disabled, progressLabel }: UploadZ
           disabled={disabled}
           className="h-3.5 w-3.5 rounded border-surface-border accent-accent"
         />
-        Conserver le fichier original après extraction (désactivé par défaut, économise l&apos;espace)
+        Conserver le fichier original après extraction (permet de le rouvrir depuis la
+        matière — décoche pour économiser l&apos;espace de stockage)
       </label>
     </div>
   );
